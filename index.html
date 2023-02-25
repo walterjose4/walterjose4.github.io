@@ -1,34 +1,55 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Reproducción de audio con subtítulos</title>
-    <script src="https://unpkg.com/subtitles-octopus/dist/subtitles-octopus.js"></script>
+    <meta charset="UTF-8" />
+    <title>Reproductor de audio con subtítulos</title>
   </head>
   <body>
-    <h1>Reproducción de audio con subtítulos</h1>
-    <audio id="audioPlayer" controls>
-      <source src="audio.mp3" type="audio/mpeg" />
-    </audio>
-    <div id="subtitles"></div>
+    <h1>Reproductor de audio con subtítulos</h1>
+    <audio id="audio" src="audio.mp3" controls></audio>
+    <div id="transcription"></div>
     <script>
-      var video = document.getElementById("audioPlayer");
-      var track = video.addTextTrack("subtitles", "Subtítulos", "en");
-
-      // Cargar el archivo SRT y agregar los subtítulos a la pista de texto
+      // Carga los subtítulos del archivo SRT
       fetch("transcription.srt")
         .then((response) => response.text())
-        .then((data) => {
-          var subtitles = new SubtitlesOctopus({
-            video: video,
-            subUrl: "data:text/plain;base64," + btoa(data),
-            fonts: [
-              "https://fonts.gstatic.com/s/roboto/v27/KFOmCnqEu92Fr1Mu4mxM.woff2",
-              "https://fonts.gstatic.com/s/roboto/v27/KFOlCnqEu92Fr1MmEU9fBBc9.ttf",
-            ],
-          });
-          subtitles.setSize("100%");
-          subtitles.assign(track);
-        });
+        .then((text) => {
+          let subtitles = parseSRT(text); // Analiza el archivo SRT
+          let transcription = document.getElementById("transcription");
+          let index = 0;
+          // Muestra los subtítulos correspondientes al tiempo actual del audio
+          document
+            .getElementById("audio")
+            .addEventListener("timeupdate", (event) => {
+              while (
+                index < subtitles.length &&
+                subtitles[index].end <= event.target.currentTime
+              ) {
+                index++;
+              }
+              transcription.textContent = subtitles[index].text;
+            });
+        })
+        .catch((error) => console.error(error));
+
+      // Analiza el archivo SRT y devuelve un arreglo de objetos de subtítulos
+      function parseSRT(text) {
+        let lines = text.trim().split(/\r?\n/);
+        let subtitles = [];
+        for (let i = 0; i < lines.length; i += 4) {
+          let index = parseInt(lines[i]);
+          let start = parseTime(lines[i + 1]);
+          let end = parseTime(lines[i + 2]);
+          let text = lines[i + 3];
+          subtitles.push({ index, start, end, text });
+        }
+        return subtitles;
+      }
+
+      // Convierte el formato de tiempo SRT (hh:mm:ss,ms) a segundos
+      function parseTime(time) {
+        let parts = time.split(/[:,]/).map(parseFloat);
+        return parts[0] * 3600 + parts[1] * 60 + parts[2] + parts[3] / 1000;
+      }
     </script>
   </body>
 </html>
